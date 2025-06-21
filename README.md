@@ -194,7 +194,7 @@ Generates trained models, learning-curve plots, and summary of dynamic adaptatio
 
 ## Results & Discussion
 
-Preliminary analyses demonstrate:
+Preliminary analyses demonstrate:                                                   
 
 * **Topology Effects:** Small‑world networks yield faster convergence but higher variance under noise.
 * **Strategy Comparison:** `M1Agent` (mean‑field) outperforms simple threshold (`M0Agent`) at low noise; multi‑step (`M3Agent`) excels when correlation is strong.
@@ -202,21 +202,3 @@ Preliminary analyses demonstrate:
 
 Full result tables and figures are available in `output/` and via Jupyter notebooks in `notebooks/` for deeper statistical analysis.
 
-## Requirements
-
-* Python 3.7+
-* `numpy`, `scipy`, `networkx`, `numba`, `dask`, `distributed`, `gymnasium`, `pandas`, `matplotlib`
-
-Install with:
-
-```bash
-pip install -r requirements.txt
-```
-
-## Contributing
-
-We welcome contributions that extend simulation scenarios, introduce new agent heuristics, or improve RL strategies. Please fork, branch, and submit pull requests with tests and clear documentation.
-
-## License
-
-Released under the MIT License. Feel free to use and adapt for research purposes.
