@@ -45,29 +45,81 @@ All simulation experiments are orchestrated in `simulation_dask.py`, which perfo
 1. **Initialization**
 
    * **Social Environment**
-     We initialized $N 	imes C$ matrices to store the behavioral tendencies of each Object in each Context. Contexts C1 and C2 are correlated, as are C3 and C4. To mimic dynamic changes in the social environment, Gaussian noise is injected into the environment every 10 rounds.
+     We initialized \$N \times C\$ matrices to store the behavioral tendencies of each Object in each Context. Contexts C1 and C2 are correlated, as are C3 and C4. To mimic dynamic changes in the social environment, Gaussian noise is injected into the environment every 10 rounds.
+
    * **Network**
      Build the interaction topology (random, small-world, or scale-free) using `NetworkBuilder`, assigning each agent its list of neighbors.
-   * **Agent**
 
-     * **M0 (Model-Free):** Performs purely random inference for each missing cell. When infer_cell is called, the agent first checks its internal storage for a previously inferred value at (row, col); if found, it returns this stored value. Otherwise, it draws a fresh sample from a standard normal distribution N(0,1). There is no neighbor communication or use of the covariance structure. 
-     * **M1 (Gossiper):**  Utilizes neighbor information with a capped gossip protocol:
+   * **Agent Types**
 
-1. **Storage Check:** On `infer_cell`, returns a stored prediction if available for (row, col).  
-2. **Neighbor Exploration:** Iterates through all neighbors, collecting up to `maximal_neighbors` (20) values:  
-   - **M0/M3 Peers:** If the neighbor has a value for (row, col), calls `infer_cell` to retrieve it; if not, records zero.  
-   - **M1 Peers:** Retrieves previously gossiped values via `get_stored_value` without invoking further inference.  
-3. **Aggregation:** Computes the arithmetic mean of collected neighbor values.  
-4. **Fallback:** If no neighbor values are gathered, samples a draw from N(0,1).  
-5. **Memory & Broadcast:** Stores the new inference for future reuse and broadcasts it to all neighbors for their caches.  
-     * **M3 (Model-Based):** M3Agents maintain a memory store of all past observed values for every matrix cell (row, column). To infer a missing value at (row, target\_column), an agent:
-2. Selects the paired `reference_column` corresponding to the target (C1⇔C2, C3⇔C4).
-3. Retrieves from memory all past pairs of observed values for the target and reference columns across previous rounds.
-4. Ensures at least `pairs_needed` data points are available; if not, returns a predefined fallback estimate.
-5. Executes the JIT-compiled `infer_element_dict` regression on the full historical sample to compute slope and intercept.
-6. Predicts the target as `intercept + slope * reference_value` using the current reference observation.
+     #### **M0: Model-Free**
 
-This memory-driven approach leverages the complete history of observations, enabling robust linear inference that adapts as the environment evolves.
+     * **Behavior:** Performs purely random inference for each missing cell.
+     * **Inference Process:**
+
+       1. **Storage Check:** If a value for `(row, col)` is already stored, return it.
+       2. **Random Sampling:** Otherwise, sample a new value from a standard normal distribution **N(0, 1)**.
+     * **Characteristics:**
+
+       * No communication with neighbors.
+       * Ignores the covariance structure.
+
+     #### **M1: Gossiper**
+
+     * **Behavior:** Uses a capped gossip protocol to infer values based on neighbor information.
+     * **Inference Process:**
+
+       1. **Storage Check:**
+
+          * Return stored value for `(row, col)` if available.
+       2. **Neighbor Exploration:**
+
+          * Iterate through neighbors, collecting up to `maximal_neighbors` (default = 20) values.
+          * **From M0/M3 Peers:**
+
+            * Call `infer_cell` if the neighbor has a value for `(row, col)`; else, record zero.
+          * **From M1 Peers:**
+
+            * Retrieve previously gossiped values via `get_stored_value` (no recursive inference).
+       3. **Aggregation:**
+
+          * Compute the arithmetic mean of collected neighbor values.
+       4. **Fallback:**
+
+          * If no neighbor values are gathered, sample from **N(0, 1)**.
+       5. **Memory & Broadcast:**
+
+          * Store the new inference for reuse.
+          * Broadcast it to all neighbors for caching.
+
+     #### **M3: Model-Based**
+
+     * **Behavior:** Uses historical data and regression for inference.
+     * **Inference Process:**
+
+       1. **Column Pairing:**
+
+          * Select a `reference_column` for the `target_column` (e.g., C1⇔C2, C3⇔C4).
+       2. **Historical Retrieval:**
+
+          * Retrieve all past pairs of values for the target and reference columns.
+       3. **Data Sufficiency Check:**
+
+          * If fewer than `pairs_needed` samples exist, return a fallback estimate.
+       4. **Regression Computation:**
+
+          * Run the JIT-compiled `infer_element_dict` to estimate slope and intercept.
+       5. **Prediction:**
+
+          * Predict using:
+
+            ```
+            prediction = intercept + slope * reference_value
+            ```
+     * **Characteristics:**
+
+       * Memory-driven and history-aware.
+       * Performs robust, adaptive linear inference.
 
 2. **Simulation Loop**
 
@@ -77,10 +129,12 @@ This memory-driven approach leverages the complete history of observations, enab
      2. **Memory Update:** Agents store the newly observed true value and their own prediction in their internal memory (M3 agents append to their full-history store; M1/M0 record neighbor-shared values).
      3. **Communication Phase:** Agents broadcast their predictions to neighbors, updating neighbor caches for the next round’s gossip or threshold checks.
      4. **Error Logging:** Each agent computes absolute and squared errors for its prediction and appends these metrics to its `prediction_errors` log.
+
    * **Environmental Noise:** Every 10 rounds, Gaussian noise (σ configured in the script) is injected into the social environment matrices to simulate evolving behavioral tendencies.
+
    * **Data Aggregation:** After completion of all rounds across network, noise, and agent configurations, results (e.g., MAE, MSE distributions) are aggregated into JSON for downstream statistical analysis.
 
-### Reinforcement Learning Module### Reinforcement Learning Module### Reinforcement Learning Module
+### Reinforcement Learning Module
 
 The adaptive component in `reinforment_learning.py` defines a custom Gym environment where agents:
 
